@@ -1,0 +1,89 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* funcao para imprimir o diretorio 
+atual antes do input do usuario, 
+simulando um terminal de verdade */
+			
+void currentDirectory() {
+    char cwd[256];
+    if (getcwd(cwd,sizeof(cwd))==NULL)
+    	perror("chdir() error()"); 
+    printf("%s >> ", cwd);
+
+/* get cwd eh uma funcao de unistd.h para pegar o nome do 
+diretorio atual e salvar num buffer
+char getcwd(char *buffer, size_t size)
+*/
+
+}
+
+int main() {
+    char command[256];
+    char *args[256];
+
+    printf("Interpretador de comandos iniciado. Digite 'exit' para sair.\n");
+    
+    while(1) {
+        // chama funcao para imprimir diretorio atual antes do input do usuario
+        currentDirectory();
+ 
+        fgets(command, sizeof(command), stdin);
+        
+        // remove um \n pois fgets ja adiciona quebra de linha
+        command[strcspn(command, "\n")] = '\0';
+
+        // compara o input com a string "exit", caso seja igual, encerra o programa. 
+        if (strcmp(command, "exit") == 0) {
+            printf("Saindo...\n");
+            break;
+        }
+
+        /* str tok divide a string usando delimitadores, util para
+        para separar o comando dos par^ametros */
+        char *token = strtok(command, " ");
+        int i = 0;
+        while (token != NULL && i < sizeof(command)) {
+            args[i] = token;
+            token = strtok(NULL, " ");
+            i++;
+        }
+        args[i] = NULL;
+
+	/* o comando cd deve ser tratado de uma forma diferente pois nao eh executado 
+	como processo filho entao fazemos a verificacao se o input dado foi cd */
+        if (strcmp(args[0], "cd") == 0) {
+            if (args[1] != NULL) {
+                if (chdir(args[1]) != 0) {
+                    perror("chdir");
+                }
+            } else {
+                // se digitar apenas cd volta para a home, assim como no terminal convencional
+                chdir(getenv("HOME"));
+            }
+            continue; // volta para o inicio do loop sem criar um novo processo
+            }
+
+        // Criar um novo processo
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            fprintf(stderr, "Erro ao criar o processo filho.\n");
+            exit(EXIT_FAILURE);
+        } else if (pid == 0) {
+            // Processo filho: executar o comando
+            execvp(args[0], args);
+            // se execvp() retornar, algo deu errado
+            perror("execvp");
+            exit(EXIT_FAILURE);
+        } else {
+            // processo pai: esperar pelo processo filho
+            wait(NULL);
+        }
+    }
+  
+    return 0;
+}
